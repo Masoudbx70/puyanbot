@@ -49,11 +49,45 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پنل مدیریت برای ادمین"""
-    if update.effective_user.id != ADMIN_ID:
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """هندلر دستور /start."""
+    user_id = update.effective_user.id
+    user_first_name = update.effective_user.first_name
+
+    # اگر کاربر ادمین باشد، پنل مدیریت نمایش داده شود
+    if user_id == ADMIN_ID:
+        await show_admin_panel(update, context)
         return
 
+    # بررسی اگر کاربر مسدود شده
+    if user_id in blocked_users:
+        await update.message.reply_text(
+            "❌ حساب شما مسدود شده است. لطفا با ادمین تماس بگیرید.",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return ConversationHandler.END
+
+    if update.effective_chat.type in ['group', 'supergroup']:
+        if user_id in verified_users:
+            # کاربر قبلاً احراز هویت شده
+            return
+        else:
+            await update.message.reply_text(
+                f"سلام {user_first_name} عزیز! 👋\nبرای فعال‌سازی حساب، لطفا ربات را در چت خصوصی استارت کنید:\n@{(await context.bot.get_me()).username}",
+                reply_markup=ReplyKeyboardRemove()
+            )
+    else:
+        # شروع فرآیند احراز هویت در چت خصوصی
+        context.user_data.clear()
+        await update.message.reply_text(
+            "سلام! خوش آمدید. 👋\nبرای تکمیل احراز هویت، لطفا اطلاعات زیر را وارد کنید.\n\n"
+            "لطفا نام و نام خانوادگی خود را وارد کنید:",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return NAME
+
+async def show_admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش پنل مدیریت برای ادمین"""
     # محاسبه آمار
     total_verified = len(verified_users)
     total_pending = len(pending_approvals)
@@ -80,9 +114,6 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_user_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش آمار کاربران"""
-    if update.effective_user.id != ADMIN_ID:
-        return
-
     total_verified = len(verified_users)
     total_pending = len(pending_approvals)
     total_blocked = len(blocked_users)
@@ -99,9 +130,6 @@ async def show_user_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_pending_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش کاربران در انتظار تأیید"""
-    if update.effective_user.id != ADMIN_ID:
-        return
-
     if not pending_approvals:
         await update.message.reply_text("⏳ هیچ کاربری در انتظار تأیید نیست.")
         return
@@ -116,19 +144,16 @@ async def show_pending_users(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"────────────────────\n"
         )
     
-    await update.message.reply_text(pending_list[:4000])  # محدودیت طول پیام
+    await update.message.reply_text(pending_list[:4000])
 
 async def show_verified_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش کاربران تأیید شده"""
-    if update.effective_user.id != ADMIN_ID:
-        return
-
     if not verified_users:
         await update.message.reply_text("✅ هیچ کاربر تأیید شده‌ای وجود ندارد.")
         return
 
     verified_list = "✅ کاربران تأیید شده:\n\n"
-    for user_id in list(verified_users)[:20]:  # نمایش 20 کاربر اول
+    for user_id in list(verified_users)[:20]:
         reg_date = user_registration_date.get(user_id, 'نامشخص')
         verified_list += f"👤 User ID: {user_id} - 📅 {reg_date}\n"
     
@@ -139,58 +164,18 @@ async def show_verified_users(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def show_blocked_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش کاربران مسدود شده"""
-    if update.effective_user.id != ADMIN_ID:
-        return
-
     if not blocked_users:
         await update.message.reply_text("❌ هیچ کاربر مسدود شده‌ای وجود ندارد.")
         return
 
     blocked_list = "❌ کاربران مسدود شده:\n\n"
-    for user_id in list(blocked_users)[:20]:  # نمایش 20 کاربر اول
+    for user_id in list(blocked_users)[:20]:
         blocked_list += f"👤 User ID: {user_id}\n"
     
     if len(blocked_users) > 20:
         blocked_list += f"\n📈 و {len(blocked_users) - 20} کاربر دیگر..."
     
     await update.message.reply_text(blocked_list)
-
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """هندلر دستور /start."""
-    user_id = update.effective_user.id
-    user_first_name = update.effective_user.first_name
-
-    # دستور /admin برای نمایش پنل مدیریت
-    if update.message.text == '/admin' and user_id == ADMIN_ID:
-        await admin_panel(update, context)
-        return
-
-    # بررسی اگر کاربر مسدود شده
-    if user_id in blocked_users:
-        await update.message.reply_text(
-            "❌ حساب شما مسدود شده است. لطفا با ادمین تماس بگیرید.",
-            reply_markup=ReplyKeyboardRemove()
-        )
-        return ConversationHandler.END
-
-    if update.effective_chat.type in ['group', 'supergroup']:
-        if user_id in verified_users:
-            welcome_text = f"سلام {user_first_name} عزیز! 👋\nشما قبلاً احراز هویت شده‌اید."
-            await update.message.reply_text(welcome_text)
-        else:
-            await update.message.reply_text(
-                f"سلام {user_first_name} عزیز! 👋\nبرای فعال‌سازی حساب، لطفا ربات را در چت خصوصی استارت کنید:\n@{(await context.bot.get_me()).username}",
-                reply_markup=ReplyKeyboardRemove()
-            )
-    else:
-        # شروع فرآیند احراز هویت در چت خصوصی
-        context.user_data.clear()
-        await update.message.reply_text(
-            "سلام! خوش آمدید. 👋\nبرای تکمیل احراز هویت، لطفا اطلاعات زیر را وارد کنید.\n\n"
-            "لطفا نام و نام خانوادگی خود را وارد کنید:",
-            reply_markup=ReplyKeyboardRemove()
-        )
-        return NAME
 
 async def get_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """دریافت نام و نام خانوادگی"""
@@ -255,7 +240,6 @@ async def get_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ لطفا یک عکس ارسال کنید:")
         return SCREENSHOT
 
-    # ذخیره اطلاعات عکس
     context.user_data['screenshot_file_id'] = update.message.photo[-1].file_id
     
     keyboard = [['✅ تایید اطلاعات', '❌ ویرایش مجدد']]
@@ -266,7 +250,7 @@ async def get_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👤 نام: {context.user_data['name']}\n"
         f"📱 شماره تماس: {context.user_data['phone']}\n"
         f"📸 اسکرین شات: ✅ ارسال شد\n\n"
-        f"آیا اطلاعات صحیح است؟",
+        f"آیا اطلاعات صحیح است？",
         reply_markup=reply_markup
     )
     return CONFIRMATION
@@ -277,12 +261,10 @@ async def confirm_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_choice = update.message.text
     
     if user_choice == '✅ تایید اطلاعات':
-        # ذخیره زمان ثبت نام
         reg_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         context.user_data['registration_time'] = reg_time
         user_registration_date[user_id] = reg_time
         
-        # ذخیره اطلاعات در pending_approvals
         pending_approvals[user_id] = context.user_data.copy()
         
         await update.message.reply_text(
@@ -291,14 +273,12 @@ async def confirm_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=ReplyKeyboardRemove()
         )
         
-        # ارسال اطلاعات به ادمین با عکس
         try:
             admin_keyboard = [
                 [f'✅ تایید کاربر {user_id}', f'❌ رد کاربر {user_id}']
             ]
             admin_reply_markup = ReplyKeyboardMarkup(admin_keyboard, resize_keyboard=True)
             
-            # ارسال عکس به ادمین
             await context.bot.send_photo(
                 ADMIN_ID,
                 photo=context.user_data['screenshot_file_id'],
@@ -316,9 +296,7 @@ async def confirm_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         except Exception as e:
             logger.error(f"Error sending message to admin: {e}")
-            await update.message.reply_text("❌ خطا در ارسال اطلاعات. لطفا بعدا تلاش کنید.")
         
-        logger.info(f"User {user_id} waiting for admin approval")
         return ConversationHandler.END
         
     elif user_choice == '❌ ویرایش مجدد':
@@ -350,20 +328,35 @@ async def handle_admin_approval(update: Update, context: ContextTypes.DEFAULT_TY
             user_data = pending_approvals.pop(user_id)
             
             try:
+                # ارسال پیام تأیید به کاربر
                 await context.bot.send_message(
                     user_id,
                     "✅ حساب شما توسط ادمین تأیید شد!\n\n"
                     "اکنون می‌توانید در گروه به صورت آزادانه چت کنید. 🎉"
                 )
+                
+                # ارسال پیام خوش آمدگویی در گروه
+                welcome_message = (
+                    f"🎉 به {user_data['first_name']} خوش آمدیم!\n\n"
+                    f"👤 کاربر جدید با موفقیت احراز هویت شد.\n"
+                    f"📛 نام: {user_data['name']}\n"
+                    f"🕒 زمان عضویت: {user_data['registration_time']}\n\n"
+                    "از حضور شما در گروه خوشحالیم! 🌟"
+                )
+                
+                await context.bot.send_message(
+                    GROUP_CHAT_ID,
+                    welcome_message
+                )
+                
             except Exception as e:
-                logger.error(f"Error sending approval message to user: {e}")
+                logger.error(f"Error sending messages: {e}")
             
             await update.message.reply_text(
-                f"✅ کاربر {user_id} تأیید شد.",
+                f"✅ کاربر {user_id} تأیید شد و در گروه معرفی گردید.",
                 reply_markup=ReplyKeyboardRemove()
             )
             
-            logger.info(f"User {user_id} approved by admin")
         else:
             await update.message.reply_text("❌ کاربر یافت نشد.")
     
@@ -385,28 +378,40 @@ async def handle_admin_approval(update: Update, context: ContextTypes.DEFAULT_TY
                     "لطفا با ادمین تماس بگیرید."
                 )
             except Exception as e:
-                logger.error(f"Error sending rejection message to user: {e}")
+                logger.error(f"Error sending rejection message: {e}")
             
             await update.message.reply_text(
                 f"❌ کاربر {user_id} رد شد و مسدود گردید.",
                 reply_markup=ReplyKeyboardRemove()
             )
 
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """لغو فرآیند احراز هویت"""
-    await update.message.reply_text(
-        "فرآیند احراز هویت لغو شد. با دستور /start می‌توانید مجدداً شروع کنید.",
-        reply_markup=ReplyKeyboardRemove()
-    )
-    return ConversationHandler.END
+async def handle_admin_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """هندلر دستورات پنل ادمین"""
+    if update.effective_user.id != ADMIN_ID:
+        return
 
-async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    command = update.message.text
+    
+    if command == '📊 آمار کاربران':
+        await show_user_stats(update, context)
+    elif command == '📋 کاربران در انتظار':
+        await show_pending_users(update, context)
+    elif command == '✅ کاربران تأیید شده':
+        await show_verified_users(update, context)
+    elif command == '❌ کاربران مسدود شده':
+        await show_blocked_users(update, context)
+    elif command == '🔄 بروزرسانی پنل':
+        await show_admin_panel(update, context)
+
+async def handle_group_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """هندلر پیام‌های گروه"""
     if update.effective_chat.id != GROUP_CHAT_ID:
         return
 
     user_id = update.effective_user.id
+    message_text = update.message.text.lower() if update.message.text else ""
     
+    # اگر کاربر مسدود شده باشد
     if user_id in blocked_users:
         try:
             await update.message.delete()
@@ -414,9 +419,22 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
             pass
         return
 
+    # اگر کاربر ادمین باشد یا احراز هویت شده باشد
     if user_id == ADMIN_ID or user_id in verified_users:
+        # پاسخ به کلمات روزمره
+        if any(greeting in message_text for greeting in ['سلام', 'سلام علیکم', 'سلام بر شما', 'hello', 'hi']):
+            responses = [
+                "سلام علیکم! 😊",
+                "سلام بر شما! 🙏",
+                "درود بر شما! 🌟",
+                "سلام عزیز! 👋"
+            ]
+            import random
+            response = random.choice(responses)
+            await update.message.reply_text(response)
         return
 
+    # مدیریت کاربران تأیید نشده
     user_message_count[user_id] += 1
     message_count = user_message_count[user_id]
 
@@ -440,23 +458,13 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
         except Exception as e:
             logger.error(f"Error sending warning: {e}")
 
-async def handle_admin_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """هندلر دستورات پنل ادمین"""
-    if update.effective_user.id != ADMIN_ID:
-        return
-
-    command = update.message.text
-    
-    if command == '📊 آمار کاربران':
-        await show_user_stats(update, context)
-    elif command == '📋 کاربران در انتظار':
-        await show_pending_users(update, context)
-    elif command == '✅ کاربران تأیید شده':
-        await show_verified_users(update, context)
-    elif command == '❌ کاربران مسدود شده':
-        await show_blocked_users(update, context)
-    elif command == '🔄 بروزرسانی پنل':
-        await admin_panel(update, context)
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """لغو فرآیند احراز هویت"""
+    await update.message.reply_text(
+        "فرآیند احراز هویت لغو شد. با دستور /start می‌توانید مجدداً شروع کنید.",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    return ConversationHandler.END
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """هندلر خطاها"""
@@ -481,13 +489,12 @@ def main():
         )
 
         application.add_handler(conv_handler)
-        application.add_handler(CommandHandler('admin', admin_panel))
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_group_message))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_group_messages))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_admin_approval))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_admin_commands))
         application.add_error_handler(error_handler)
 
-        logger.info("🤖 Bot is starting with admin panel and screenshot system...")
+        logger.info("🤖 Bot is starting with all features...")
         print("✅ Bot started successfully!")
         
         application.run_polling()
