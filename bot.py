@@ -93,21 +93,21 @@ async def show_admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_pending = len(pending_approvals)
     total_blocked = len(blocked_users)
     
-    # ایجاد کیبورد پنل ادمین
+    # ایجاد کیبورد پنل ادمین حرفه‌ای
     admin_keyboard = [
         ['📊 آمار کاربران', '📋 کاربران در انتظار'],
         ['✅ کاربران تأیید شده', '❌ کاربران مسدود شده'],
-        ['🔄 بروزرسانی پنل']
+        ['🗑️ پاک کردن حافظه', '🔄 بروزرسانی پنل']
     ]
     reply_markup = ReplyKeyboardMarkup(admin_keyboard, resize_keyboard=True)
     
     stats_message = (
-        "👨‍💼 پنل مدیریت ربات\n\n"
+        "👨‍💼 پنل مدیریت حرفه‌ای ربات\n\n"
         f"📊 آمار کلی:\n"
         f"✅ کاربران تأیید شده: {total_verified} نفر\n"
         f"⏳ کاربران در انتظار: {total_pending} نفر\n"
         f"❌ کاربران مسدود شده: {total_blocked} نفر\n\n"
-        "لطفا گزینه مورد نظر را انتخاب کنید:"
+        "🔧 گزینه مورد نظر را انتخاب کنید:"
     )
     
     await update.message.reply_text(stats_message, reply_markup=reply_markup)
@@ -119,11 +119,12 @@ async def show_user_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_blocked = len(blocked_users)
     
     stats_message = (
-        "📊 آمار کاربران:\n\n"
+        "📊 آمار دقیق کاربران:\n\n"
         f"✅ کاربران تأیید شده: {total_verified} نفر\n"
-        f"⏳ کاربران در انتظار: {total_pending} نفر\n"
+        f"⏳ کاربران در انتظار تأیید: {total_pending} نفر\n"
         f"❌ کاربران مسدود شده: {total_blocked} نفر\n\n"
-        f"📈 مجموع کاربران: {total_verified + total_pending + total_blocked} نفر"
+        f"📈 مجموع کاربران: {total_verified + total_pending + total_blocked} نفر\n"
+        f"🔄 آخرین بروزرسانی: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
     )
     
     await update.message.reply_text(stats_message)
@@ -131,51 +132,120 @@ async def show_user_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def show_pending_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش کاربران در انتظار تأیید"""
     if not pending_approvals:
-        await update.message.reply_text("⏳ هیچ کاربری در انتظار تأیید نیست.")
+        await update.message.reply_text("✅ هیچ کاربری در انتظار تأیید نیست.")
         return
 
     pending_list = "📋 کاربران در انتظار تأیید:\n\n"
-    for user_id, data in pending_approvals.items():
+    for i, (user_id, data) in enumerate(pending_approvals.items(), 1):
         pending_list += (
-            f"👤 User ID: {user_id}\n"
-            f"📛 نام: {data['name']}\n"
-            f"📱 تلفن: {data['phone']}\n"
-            f"🕒 ثبت: {data.get('registration_time', 'نامشخص')}\n"
-            f"────────────────────\n"
+            f"#{i} - 🆔 {user_id}\n"
+            f"   📛 نام: {data['name']}\n"
+            f"   📱 تلفن: {data['phone']}\n"
+            f"   🕒 ثبت: {data.get('registration_time', 'نامشخص')}\n"
+            f"   ────────────────────\n"
         )
+    
+    pending_list += f"\n📝 تعداد کل: {len(pending_approvals)} کاربر"
     
     await update.message.reply_text(pending_list[:4000])
 
 async def show_verified_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش کاربران تأیید شده"""
     if not verified_users:
-        await update.message.reply_text("✅ هیچ کاربر تأیید شده‌ای وجود ندارد.")
+        await update.message.reply_text("📭 هیچ کاربر تأیید شده‌ای وجود ندارد.")
         return
 
     verified_list = "✅ کاربران تأیید شده:\n\n"
-    for user_id in list(verified_users)[:20]:
+    for i, user_id in enumerate(list(verified_users)[:15], 1):
         reg_date = user_registration_date.get(user_id, 'نامشخص')
-        verified_list += f"👤 User ID: {user_id} - 📅 {reg_date}\n"
+        verified_list += f"#{i} - 🆔 {user_id} - 📅 {reg_date}\n"
     
-    if len(verified_users) > 20:
-        verified_list += f"\n📈 و {len(verified_users) - 20} کاربر دیگر..."
+    if len(verified_users) > 15:
+        verified_list += f"\n📦 و {len(verified_users) - 15} کاربر دیگر..."
+    
+    verified_list += f"\n📊 تعداد کل: {len(verified_users)} کاربر"
     
     await update.message.reply_text(verified_list)
 
 async def show_blocked_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش کاربران مسدود شده"""
     if not blocked_users:
-        await update.message.reply_text("❌ هیچ کاربر مسدود شده‌ای وجود ندارد.")
+        await update.message.reply_text("✅ هیچ کاربر مسدود شده‌ای وجود ندارد.")
         return
 
     blocked_list = "❌ کاربران مسدود شده:\n\n"
-    for user_id in list(blocked_users)[:20]:
-        blocked_list += f"👤 User ID: {user_id}\n"
+    for i, user_id in enumerate(list(blocked_users)[:15], 1):
+        blocked_list += f"#{i} - 🆔 {user_id}\n"
     
-    if len(blocked_users) > 20:
-        blocked_list += f"\n📈 و {len(blocked_users) - 20} کاربر دیگر..."
+    if len(blocked_users) > 15:
+        blocked_list += f"\n📦 و {len(blocked_users) - 15} کاربر دیگر..."
+    
+    blocked_list += f"\n📊 تعداد کل: {len(blocked_users)} کاربر"
     
     await update.message.reply_text(blocked_list)
+
+async def clear_memory(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پاک کردن حافظه ربات"""
+    # ایجاد کیبورد تأیید
+    confirm_keyboard = [['🔥 بله، پاک کن', '❌ انصراف']]
+    reply_markup = ReplyKeyboardMarkup(confirm_keyboard, resize_keyboard=True)
+    
+    confirmation_message = (
+        "⚠️ هشدار: عملیات پاک کردن حافظه\n\n"
+        "🔸 این عمل تمام داده‌های زیر را پاک می‌کند:\n"
+        "   • کاربران تأیید شده\n"
+        "   • کاربران در انتظار\n"
+        "   • کاربران مسدود شده\n"
+        "   • تاریخ‌های ثبت نام\n"
+        "   • شمارنده پیام‌ها\n\n"
+        "🔸 داده‌های کاربران باید مجدداً ثبت شوند.\n"
+        "🔸 این عمل غیرقابل بازگشت است!\n\n"
+        "آیا مطمئن هستید؟"
+    )
+    
+    await update.message.reply_text(confirmation_message, reply_markup=reply_markup)
+
+async def handle_clear_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """هندلر تأیید پاک کردن حافظه"""
+    user_choice = update.message.text
+    
+    if user_choice == '🔥 بله، پاک کن':
+        # ذخیره تعداد قبل از پاک کردن برای گزارش
+        total_verified = len(verified_users)
+        total_pending = len(pending_approvals)
+        total_blocked = len(blocked_users)
+        
+        # پاک کردن تمام داده‌ها
+        verified_users.clear()
+        pending_approvals.clear()
+        blocked_users.clear()
+        user_message_count.clear()
+        user_registration_date.clear()
+        
+        # ارسال گزارش پاک کردن
+        report_message = (
+            "✅ حافظه ربات با موفقیت پاک شد!\n\n"
+            f"📊 داده‌های پاک شده:\n"
+            f"   • کاربران تأیید شده: {total_verified} نفر\n"
+            f"   • کاربران در انتظار: {total_pending} نفر\n"
+            f"   • کاربران مسدود شده: {total_blocked} نفر\n"
+            f"   • تاریخ‌های ثبت نام: {len(user_registration_date)} مورد\n\n"
+            f"🔄 تمام داده‌ها reset شدند.\n"
+            f"⏰ زمان: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+        
+        await update.message.reply_text(report_message, reply_markup=ReplyKeyboardRemove())
+        logger.info("Memory cleared by admin")
+        
+        # بازگشت به پنل اصلی
+        await show_admin_panel(update, context)
+        
+    elif user_choice == '❌ انصراف':
+        await update.message.reply_text(
+            "❌ عملیات پاک کردن حافظه لغو شد.",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        await show_admin_panel(update, context)
 
 async def get_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """دریافت نام و نام خانوادگی"""
@@ -234,7 +304,7 @@ async def get_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if user_id in blocked_users:
         await update.message.reply_text("❌ حساب شما مسدود شده است.")
-        return ConversationHandler.END
+        return SCREENSHOT
 
     if not update.message.photo:
         await update.message.reply_text("❌ لطفا یک عکس ارسال کنید:")
@@ -250,7 +320,7 @@ async def get_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👤 نام: {context.user_data['name']}\n"
         f"📱 شماره تماس: {context.user_data['phone']}\n"
         f"📸 اسکرین شات: ✅ ارسال شد\n\n"
-        f"آیا اطلاعات صحیح است？",
+        f"آیا اطلاعات صحیح است؟",
         reply_markup=reply_markup
     )
     return CONFIRMATION
@@ -400,8 +470,12 @@ async def handle_admin_commands(update: Update, context: ContextTypes.DEFAULT_TY
         await show_verified_users(update, context)
     elif command == '❌ کاربران مسدود شده':
         await show_blocked_users(update, context)
+    elif command == '🗑️ پاک کردن حافظه':
+        await clear_memory(update, context)
     elif command == '🔄 بروزرسانی پنل':
         await show_admin_panel(update, context)
+    elif command in ['🔥 بله، پاک کن', '❌ انصراف']:
+        await handle_clear_confirmation(update, context)
 
 async def handle_group_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """هندلر پیام‌های گروه"""
@@ -494,7 +568,7 @@ def main():
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_admin_commands))
         application.add_error_handler(error_handler)
 
-        logger.info("🤖 Bot is starting with all features...")
+        logger.info("🤖 Bot is starting with professional admin panel...")
         print("✅ Bot started successfully!")
         
         application.run_polling()
