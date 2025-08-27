@@ -1,5 +1,6 @@
 import os
 import logging
+import time
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton
 from telegram.ext import (
     Application, 
@@ -476,6 +477,9 @@ async def handle_admin_commands(update: Update, context: ContextTypes.DEFAULT_TY
         await show_admin_panel(update, context)
     elif command in ['🔥 بله، پاک کن', '❌ انصراف']:
         await handle_clear_confirmation(update, context)
+    else:
+        # اگر دستور شناخته شده نبود، پنل اصلی را نشان بده
+        await show_admin_panel(update, context)
 
 async def handle_group_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """هندلر پیام‌های گروه"""
@@ -549,7 +553,11 @@ def main():
     try:
         application = Application.builder().token(BOT_TOKEN).build()
 
-        # ConversationHandler برای احراز هویت
+        # ابتدا هندلرهای ادمین را اضافه کنیم (اولویت بالاتر)
+        application.add_handler(MessageHandler(filters.TEXT & filters.Chat(chat_id=ADMIN_ID), handle_admin_commands))
+        application.add_handler(MessageHandler(filters.TEXT & filters.Chat(chat_id=ADMIN_ID), handle_admin_approval))
+        
+        # سپس ConversationHandler برای احراز هویت
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler('start', start_command)],
             states={
@@ -563,14 +571,13 @@ def main():
         )
 
         application.add_handler(conv_handler)
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_group_messages))
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_admin_approval))
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_admin_commands))
+        application.add_handler(MessageHandler(filters.TEXT & filters.Chat(chat_id=GROUP_CHAT_ID), handle_group_messages))
         application.add_error_handler(error_handler)
 
         logger.info("🤖 Bot is starting with professional admin panel...")
         print("✅ Bot started successfully!")
         
+        # اجرای ربات
         application.run_polling()
         
     except Exception as e:
