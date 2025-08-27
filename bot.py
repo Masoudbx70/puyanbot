@@ -395,6 +395,7 @@ async def handle_admin_approval(update: Update, context: ContextTypes.DEFAULT_TY
             return
 
         if user_id in pending_approvals:
+            # تأیید کاربر
             verified_users.add(user_id)
             user_data = pending_approvals.pop(user_id)
             
@@ -405,7 +406,10 @@ async def handle_admin_approval(update: Update, context: ContextTypes.DEFAULT_TY
                     "✅ حساب شما توسط ادمین تأیید شد!\n\n"
                     "اکنون می‌توانید در گروه به صورت آزادانه چت کنید. 🎉"
                 )
-                
+            except Exception as e:
+                logger.error(f"Error sending approval message to user {user_id}: {e}")
+            
+            try:
                 # ارسال پیام خوش آمدگویی در گروه
                 welcome_message = (
                     f"🎉 به {user_data['first_name']} خوش آمدیم!\n\n"
@@ -419,17 +423,22 @@ async def handle_admin_approval(update: Update, context: ContextTypes.DEFAULT_TY
                     GROUP_CHAT_ID,
                     welcome_message
                 )
-                
             except Exception as e:
-                logger.error(f"Error sending messages: {e}")
+                logger.error(f"Error sending welcome message to group: {e}")
             
+            # ارسال پیام تأیید به ادمین
             await update.message.reply_text(
-                f"✅ کاربر {user_id} تأیید شد و در گروه معرفی گردید.",
+                f"✅ کاربر {user_id} با موفقیت تأیید شد.\n"
+                f"📛 نام: {user_data['name']}\n"
+                f"📱 شماره: {user_data['phone']}\n\n"
+                f"پیام خوش آمدگویی در گروه ارسال شد.",
                 reply_markup=ReplyKeyboardRemove()
             )
             
+            logger.info(f"User {user_id} approved by admin")
+            
         else:
-            await update.message.reply_text("❌ کاربر یافت نشد.")
+            await update.message.reply_text("❌ کاربر یافت نشد یا قبلاً پردازش شده است.")
     
     elif '❌ رد کاربر' in message_text:
         try:
@@ -439,22 +448,32 @@ async def handle_admin_approval(update: Update, context: ContextTypes.DEFAULT_TY
             return
 
         if user_id in pending_approvals:
+            # مسدود کردن کاربر
             blocked_users.add(user_id)
             user_data = pending_approvals.pop(user_id)
             
             try:
+                # ارسال پیام رد به کاربر
                 await context.bot.send_message(
                     user_id,
                     "❌ درخواست احراز هویت شما توسط ادمین رد شد.\n\n"
                     "لطفا با ادمین تماس بگیرید."
                 )
             except Exception as e:
-                logger.error(f"Error sending rejection message: {e}")
+                logger.error(f"Error sending rejection message to user {user_id}: {e}")
             
+            # ارسال پیام رد به ادمین
             await update.message.reply_text(
-                f"❌ کاربر {user_id} رد شد و مسدود گردید.",
+                f"❌ کاربر {user_id} رد شد و مسدود گردید.\n"
+                f"📛 نام: {user_data['name']}\n"
+                f"📱 شماره: {user_data['phone']}\n\n"
+                f"این کاربر نمی‌تواند مجدداً ثبت نام کند.",
                 reply_markup=ReplyKeyboardRemove()
             )
+            
+            logger.info(f"User {user_id} rejected by admin")
+        else:
+            await update.message.reply_text("❌ کاربر یافت نشد یا قبلاً پردازش شده است.")
 
 async def handle_admin_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """هندلر دستورات پنل ادمین"""
