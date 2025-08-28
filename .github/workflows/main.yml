@@ -8,6 +8,7 @@ on:
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6 hours max
 
     steps:
     - name: Checkout repository
@@ -23,9 +24,15 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Run Bot
+    - name: Run Bot with auto-restart
       env:
         BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         ADMIN_ID: ${{ secrets.ADMIN_ID }}
         GROUP_CHAT_ID: ${{ secrets.GROUP_CHAT_ID }}
-      run: python bot.py
+      run: |
+        # اسکریپت اجرای با restart اتوماتیک
+        while true; do
+          python bot.py
+          echo "Bot crashed, restarting in 5 seconds..."
+          sleep 5
+        done
