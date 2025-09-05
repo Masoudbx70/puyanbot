@@ -1,0 +1,35 @@
+name: Telegram Bot
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'  # روزی یک بار اجرا شود
+  push:
+    branches: [ main ]
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run Telegram Bot
+      env:
+        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        ADMIN_ID: ${{ secrets.ADMIN_ID }}
+        GROUP_CHAT_ID: ${{ secrets.GROUP_CHAT_ID }}
+      run: |
+        echo "🤖 Starting Telegram Bot..."
+        python main.py
